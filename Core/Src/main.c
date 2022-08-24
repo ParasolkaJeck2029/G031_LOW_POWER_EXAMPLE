@@ -264,7 +264,7 @@ static void MX_LPTIM1_Init(void)
   /* USER CODE END LPTIM1_Init 1 */
   hlptim1.Instance = LPTIM1;
   hlptim1.Init.Clock.Source = LPTIM_CLOCKSOURCE_APBCLOCK_LPOSC;
-  hlptim1.Init.Clock.Prescaler = LPTIM_PRESCALER_DIV1;
+  hlptim1.Init.Clock.Prescaler = LPTIM_PRESCALER_DIV128;
   hlptim1.Init.Trigger.Source = LPTIM_TRIGSOURCE_SOFTWARE;
   hlptim1.Init.OutputPolarity = LPTIM_OUTPUTPOLARITY_HIGH;
   hlptim1.Init.UpdateMode = LPTIM_UPDATE_ENDOFPERIOD;
@@ -376,6 +376,7 @@ static void MX_GPIO_Init(void)
 void HAL_LPTIM_CompareMatchCallback(LPTIM_HandleTypeDef *hlptim){
 	printf("LPTIM callback\r\n");
 	HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
+	HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_1);
 }
 
 void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin){
