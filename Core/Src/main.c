@@ -22,6 +22,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
+#include <math.h>
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -114,11 +116,11 @@ int main(void)
   {
     /* USER CODE END WHILE */
 	  HAL_ADC_Start(&hadc1);
-	  HAL_Delay(50);
+	  HAL_Delay(250);
 	  char buff[32];
 	  uint16_t adc_val = HAL_ADC_GetValue(&hadc1);
 	  float temp = getTempFromTermistor(adc_val);
-	  sprintf(buff, "Temperature %.1f\r\n", temp);
+	  sprintf(buff, "Temperature %.1f*C\r\n", temp);
 	  printf(buff);
 	  if (HAL_GetTick() - timer_last_press > 5000){
 		  printf("go sleep\r\n");
