@@ -21,7 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -31,6 +31,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define RESISTOR_REAL_VALUE 10000
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -44,7 +45,8 @@ ADC_HandleTypeDef hadc1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-
+volatile uint32_t timer_last_press;
+volatile uint8_t sleep_flag;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -53,7 +55,18 @@ static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_ADC1_Init(void);
 /* USER CODE BEGIN PFP */
-
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin);
+float getTempFromTermistor(uint16_t adc_val);
+size_t __write(int handle, const unsigned char * buffer, size_t size)
+{
+  HAL_UART_Transmit(&huart2, (uint8_t *) buffer, size, HAL_MAX_DELAY);
+  return size;
+}
+int __io_putchar(int ch)
+{
+  HAL_UART_Transmit(&huart2, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
+  return ch;
+}
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -92,21 +105,29 @@ int main(void)
   MX_USART2_UART_Init();
   MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
-  printf("\r\n========Start power test=======\r\n");
+  printf("\r\n========Start low power test=======\r\n");
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-  	  printf("loop\r\n");
-  	  HAL_Delay(50);
-  	  if (HAL_GetTick() - timer_last_press > 5000){
-  		  printf("go sleep\r\n");
-  		  sleep_flag = 1;
-  		  HAL_SuspendTick();
-  		  HAL_PWR_EnableSleepOnExit();
-  		  HAL_PWR_EnterSLEEPMode(PWR_MAINREGULATOR_ON, PWR_SLEEPENTRY_WFI);
+    /* USER CODE END WHILE */
+	  HAL_ADC_Start(&hadc1);
+	  HAL_Delay(50);
+	  char buff[32];
+	  uint16_t adc_val = HAL_ADC_GetValue(&hadc1);
+	  float temp = getTempFromTermistor(adc_val);
+	  sprintf(buff, "Temperature %.1f\r\n", temp);
+	  printf(buff);
+	  if (HAL_GetTick() - timer_last_press > 5000){
+		  printf("go sleep\r\n");
+	 	  sleep_flag = 1;
+	 	  HAL_SuspendTick();
+	 	  HAL_PWR_EnableSleepOnExit();
+	 	  HAL_PWR_EnterSLEEPMode(PWR_MAINREGULATOR_ON, PWR_SLEEPENTRY_WFI);
+	 }
+    /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
 }
@@ -276,11 +297,11 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LD3_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : PA12 */
-  GPIO_InitStruct.Pin = GPIO_PIN_12;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  /*Configure GPIO pin : BUTTON_Pin */
+  GPIO_InitStruct.Pin = BUTTON_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(BUTTON_GPIO_Port, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI2_3_IRQn, 0, 0);
@@ -292,7 +313,29 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin){
 
+	if (GPIO_Pin == BUTTON_Pin || GPIO_Pin == GPIO_PIN_2){
+		if (sleep_flag == 1){
+			HAL_ResumeTick();
+			printf("wake up\r\n");
+			HAL_PWR_DisableSleepOnExit();
+			sleep_flag = 0;
+		}
+		timer_last_press = HAL_GetTick();
+		HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
+		//NVIC_SystemReset();
+	}
+}
+float getTempFromTermistor(uint16_t adc_val){
+	float temp;
+	temp = RESISTOR_REAL_VALUE / (4095.0f / adc_val -1.0f);
+	temp /= 10000;
+	temp = (float)log(temp) / 3950.0f;
+	temp += (float) 1.0f / (25.0f + 273.15f);
+	temp = 1/temp - 273.15;
+	return temp;
+}
 /* USER CODE END 4 */
 
 /**

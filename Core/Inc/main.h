@@ -66,6 +66,9 @@ void Error_Handler(void);
 #define T_VCP_RX_GPIO_Port GPIOA
 #define LD3_Pin GPIO_PIN_6
 #define LD3_GPIO_Port GPIOC
+#define BUTTON_Pin GPIO_PIN_12
+#define BUTTON_GPIO_Port GPIOA
+#define BUTTON_EXTI_IRQn EXTI4_15_IRQn
 #define T_JTMS_Pin GPIO_PIN_13
 #define T_JTMS_GPIO_Port GPIOA
 #define T_JTCK_Pin GPIO_PIN_14
