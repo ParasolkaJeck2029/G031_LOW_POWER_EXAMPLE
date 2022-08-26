@@ -34,6 +34,8 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define RESISTOR_REAL_VALUE 10000
+#define Termistor_on() HAL_GPIO_WritePin(TERMISTOR_PWR_GPIO_Port, TERMISTOR_PWR_Pin, GPIO_PIN_SET)
+#define Termistor_off() HAL_GPIO_WritePin(TERMISTOR_PWR_GPIO_Port, TERMISTOR_PWR_Pin, GPIO_PIN_RESET)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -125,18 +127,20 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 	  HAL_ADC_Start(&hadc1);
-	  HAL_Delay(250);
+	  HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
 	  char buff[32];
 	  uint16_t adc_val = HAL_ADC_GetValue(&hadc1);
 	  float temp = getTempFromTermistor(adc_val);
 	  sprintf(buff, "Temperature %.1f*C\r\n", temp);
 	  printf(buff);
-	  if (HAL_GetTick() - timer_last_press > 250){
+	  if (HAL_GetTick() - timer_last_press > 15){
 		  printf("go sleep\r\n");
+		  Termistor_off();
 	 	  sleep_flag = 1;
 	 	  HAL_SuspendTick();
 	 	  HAL_PWR_EnableSleepOnExit();
-	 	  HAL_PWR_EnterSLEEPMode(PWR_MAINREGULATOR_ON, PWR_SLEEPENTRY_WFI);
+	 	  //HAL_PWR_EnterSTOPMode(PWR_MAINREGULATOR_ON, PWR_STOPENTRY_WFI);
+	 	  HAL_PWR_EnterSLEEPMode(PWR_MAINREGULATOR_ON, PWR_STOPENTRY_WFI);
 	 }
   }
   /* USER CODE END 3 */
@@ -264,7 +268,7 @@ static void MX_LPTIM1_Init(void)
   /* USER CODE END LPTIM1_Init 1 */
   hlptim1.Instance = LPTIM1;
   hlptim1.Init.Clock.Source = LPTIM_CLOCKSOURCE_APBCLOCK_LPOSC;
-  hlptim1.Init.Clock.Prescaler = LPTIM_PRESCALER_DIV1;
+  hlptim1.Init.Clock.Prescaler = LPTIM_PRESCALER_DIV8;
   hlptim1.Init.Trigger.Source = LPTIM_TRIGSOURCE_SOFTWARE;
   hlptim1.Init.OutputPolarity = LPTIM_OUTPUTPOLARITY_HIGH;
   hlptim1.Init.UpdateMode = LPTIM_UPDATE_ENDOFPERIOD;
@@ -330,9 +334,13 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(TERMISTOR_PWR_GPIO_Port, TERMISTOR_PWR_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
@@ -349,6 +357,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : TERMISTOR_PWR_Pin */
+  GPIO_InitStruct.Pin = TERMISTOR_PWR_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(TERMISTOR_PWR_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : LD3_Pin */
   GPIO_InitStruct.Pin = LD3_Pin;
@@ -378,10 +393,13 @@ void HAL_LPTIM_CompareMatchCallback(LPTIM_HandleTypeDef *hlptim){
 	HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
 	HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_1);
 	if (sleep_flag == 1){
+		SystemClock_Config();
 		HAL_ResumeTick();
 		printf("wake up\r\n");
 		HAL_PWR_DisableSleepOnExit();
 		sleep_flag = 0;
+		Termistor_on();
+		timer_last_press = HAL_GetTick();
 	}
 }
 
@@ -392,6 +410,7 @@ void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin){
 			HAL_ResumeTick();
 			printf("wake up\r\n");
 			HAL_PWR_DisableSleepOnExit();
+			Termistor_on();
 			sleep_flag = 0;
 		}
 		timer_last_press = HAL_GetTick();
